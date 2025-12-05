@@ -17,8 +17,24 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// Endpoint de autenticación
-Route::post('/auth/login', [AuthController::class, 'login']);
+// Endpoint de autenticación (con CORS habilitado)
+Route::middleware(['cors'])->group(function () {
+    Route::post('/auth/login', [AuthController::class, 'login']);
+    
+    // RUTA TEMPORAL SOLO PARA TESTING (NO usar en producción)
+    Route::get('/auth/login', function() {
+        return response()->json([
+            'message' => 'Este endpoint requiere POST con credenciales',
+            'example' => [
+                'method' => 'POST',
+                'body' => [
+                    'email' => 'admin@test.com',
+                    'password' => 'password123'
+                ]
+            ]
+        ]);
+    });
+});
 
 /*
 |--------------------------------------------------------------------------
