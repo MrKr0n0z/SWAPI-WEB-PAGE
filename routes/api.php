@@ -11,31 +11,51 @@ use App\Http\Controllers\Api\V1\VehicleController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-// Rutas públicas de autenticación
+/*
+|--------------------------------------------------------------------------
+| RUTAS PÚBLICAS (Sin Autenticación)
+|--------------------------------------------------------------------------
+*/
+
+// Endpoint de autenticación
 Route::post('/auth/login', [AuthController::class, 'login']);
 
-// Ruta de sincronización (pública para desarrollo)
-Route::post('/sync', [SyncController::class, 'sync']);
+/*
+|--------------------------------------------------------------------------
+| RUTAS PROTEGIDAS (Requieren Autenticación + Rate Limiting)
+|--------------------------------------------------------------------------
+| Middlewares aplicados:
+| - auth:sanctum: Valida token Bearer válido y no expirado
+| - throttle:60,1: Limita a 60 peticiones por minuto por usuario
+*/
 
-// Rutas API v1 - SWAPI Compatible
-Route::prefix('v1')->group(function () {
-    Route::apiResource('films', FilmController::class)->only(['index', 'show']);
-    Route::apiResource('people', PersonController::class)->only(['index', 'show']);
-    Route::apiResource('planets', PlanetController::class)->only(['index', 'show']);
-    Route::apiResource('species', SpeciesController::class)->only(['index', 'show']);
-    Route::apiResource('starships', StarshipController::class)->only(['index', 'show']);
-    Route::apiResource('vehicles', VehicleController::class)->only(['index', 'show']);
-});
-
-// Rutas protegidas con autenticación Sanctum
-Route::middleware('auth:sanctum')->group(function () {
-    // Rutas de autenticación
-    Route::get('/auth/me', [AuthController::class, 'me']);
-    Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
-    Route::post('/auth/logout', [AuthController::class, 'logout']);
+Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     
-    // Ruta de usuario heredada (opcional, mantenida por compatibilidad)
+    // Rutas de gestión de usuario autenticado
+    Route::prefix('auth')->group(function () {
+        Route::get('/me', [AuthController::class, 'me']);
+        Route::post('/change-password', [AuthController::class, 'changePassword']);
+        Route::post('/logout', [AuthController::class, 'logout']);
+    });
+
+    // API SWAPI v1 - PROTEGIDA CON AUTENTICACIÓN Y RATE LIMITING
+    Route::prefix('v1')->group(function () {
+        Route::apiResource('films', FilmController::class)->only(['index', 'show']);
+        Route::apiResource('people', PersonController::class)->only(['index', 'show']);
+        Route::apiResource('planets', PlanetController::class)->only(['index', 'show']);
+        Route::apiResource('species', SpeciesController::class)->only(['index', 'show']);
+        Route::apiResource('starships', StarshipController::class)->only(['index', 'show']);
+        Route::apiResource('vehicles', VehicleController::class)->only(['index', 'show']);
+    });
+
+    // Sincronización de datos (protegida para producción)
+    Route::post('/sync', [SyncController::class, 'sync']);
+    
+    // Ruta de usuario heredada (compatibilidad)
     Route::get('/user', function (Request $request) {
-        return $request->user();
+        return response()->json([
+            'success' => true,
+            'data' => $request->user()
+        ]);
     });
 });

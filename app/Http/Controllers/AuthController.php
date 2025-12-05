@@ -12,39 +12,62 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     /**
-     * Autenticar usuario y generar token
+     * Autenticar usuario y generar token con expiración y seguridad
      */
     public function login(Request $request): JsonResponse
     {
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
+        ], [
+            'email.required' => 'El email es obligatorio',
+            'email.email' => 'El email debe tener un formato válido',
+            'password.required' => 'La contraseña es obligatoria',
         ]);
 
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['Las credenciales proporcionadas son incorrectas.'],
-            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Credenciales inválidas. Verifica tu email y contraseña.',
+                'errors' => [
+                    'credentials' => ['Email o contraseña incorrectos']
+                ]
+            ], 401);
         }
+
+        // SEGURIDAD: Revocar todos los tokens anteriores del usuario
+        $user->tokens()->delete();
 
         // Actualizar último acceso
         $user->update([
             'last_login_at' => now(),
         ]);
 
-        // Generar token
-        $token = $user->createToken('auth-token')->plainTextToken;
+        // Generar nuevo token con nombre específico y expiración (60 minutos configurado en sanctum.php)
+        $token = $user->createToken(
+            'api-token', 
+            ['*'], // Permisos (todas las abilities)
+            now()->addMinutes(60) // Expiración explícita de 60 minutos
+        )->plainTextToken;
 
         return response()->json([
             'success' => true,
-            'message' => 'Inicio de sesión exitoso',
+            'message' => 'Autenticación exitosa',
             'data' => [
-                'user' => $user->fresh(), // Refrescar datos del usuario
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'last_login_at' => $user->last_login_at,
+                ],
                 'token' => $token,
+                'token_type' => 'Bearer',
+                'expires_in' => 3600, // 60 minutos en segundos
             ],
-        ]);
+        ], 200);
     }
 
     /**
