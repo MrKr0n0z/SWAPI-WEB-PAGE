@@ -12,13 +12,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // NO prepender EnsureFrontendRequestsAreStateful para API stateless con Bearer tokens
-        // Este middleware solo se necesita para SPAs stateful (cookies)
-        
         $middleware->alias([
             'cors' => \Illuminate\Http\Middleware\HandleCors::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No autenticado.',
+                ], 401);
+            }
+        });
     })->create();

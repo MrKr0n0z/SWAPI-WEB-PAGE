@@ -12,45 +12,37 @@ class SwapiService
     /**
      * Obtiene un solo recurso de la API de SWAPI
      */
-    public function fetchOne(string $resource, int $id): array
-    {
-        $response = Http::get(self::BASE_URL . "/{$resource}/{$id}/");
+   public function fetchOne(string $resource, int $id): array
+{
+    $response = Http::withoutVerifying()->get(self::BASE_URL . "/{$resource}/{$id}/");
+
+    if (!$response->successful()) {
+        throw new \Exception("Failed to fetch {$resource} with ID {$id}: " . $response->body());
+    }
+
+    return $response->json();
+}
+
+public function fetchAll(string $resource): Collection
+{
+    $allResults = collect();
+    $url = self::BASE_URL . "/{$resource}/";
+
+    do {
+        $response = Http::withoutVerifying()->get($url);
 
         if (!$response->successful()) {
-            throw new \Exception("Failed to fetch {$resource} with ID {$id}: " . $response->body());
+            throw new \Exception("Failed to fetch {$resource}: " . $response->body());
         }
 
-        return $response->json();
-    }
+        $data = $response->json();
+        $allResults = $allResults->concat($data['results']);
+        $url = $data['next'];
 
-    /**
-     * Obtiene TODOS los recursos de la API de SWAPI con manejo de paginación
-     */
-    public function fetchAll(string $resource): Collection
-    {
-        $allResults = collect();
-        $url = self::BASE_URL . "/{$resource}/";
+    } while ($url !== null);
 
-        do {
-            $response = Http::get($url);
-
-            if (!$response->successful()) {
-                throw new \Exception("Failed to fetch {$resource}: " . $response->body());
-            }
-
-            $data = $response->json();
-            
-            // Agregar todos los resultados de esta página
-            $allResults = $allResults->concat($data['results']);
-            
-            // Siguiente URL para la paginación
-            $url = $data['next'];
-
-        } while ($url !== null);
-
-        return $allResults;
-    }
-
+    return $allResults;
+}
     /**
      * Extrae el ID de una URL de SWAPI
      */
